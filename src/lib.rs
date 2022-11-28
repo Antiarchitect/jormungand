@@ -1,29 +1,39 @@
 use std::{
+    clone::Clone,
     future::Future,
     pin::Pin,
-    task::{Context, Poll},
     sync::Arc,
+    task::{Context, Poll, Waker},
 };
 
+use parking_lot::Mutex;
 use ringbuffer::AllocRingBuffer as RingBuffer;
 use ringbuffer::{RingBufferRead, RingBufferWrite};
-use parking_lot::Mutex;
 
-type Shared<T> = Arc<Mutex<RingBuffer<T>>>;
+type AsyncSafeShared<T> = Arc<Mutex<Shared<T>>>;
 
-pub struct Sender<T>(Shared<T>);
+#[derive(Clone)]
+struct Shared<T>
+where
+    T: Clone,
+{
+    queue: RingBuffer<T>,
+    recv_waker: Option<Waker>,
+}
 
-impl<T> Sender<T> {
+pub struct Sender<T: Clone>(AsyncSafeShared<T>);
+
+impl<T: Clone> Sender<T> {
     pub fn send(&self, item: T) -> SendFut<T> {
         SendFut {
             sender: self.0.clone(),
-            item: item,
+            item,
         }
     }
 }
 
-pub struct SendFut<T> {
-    sender: Shared<T>,
+pub struct SendFut<T: Clone> {
+    sender: AsyncSafeShared<T>,
     item: T,
 }
 
@@ -31,45 +41,54 @@ impl<T: Clone> Future for SendFut<T> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.sender.lock().enqueue(self.item.clone());
+        println!("SendFut polled!");
+        let mut locked = self.sender.lock();
+        locked.queue.enqueue(self.item.clone());
+        if let Some(waker) = locked.recv_waker.take() {
+            waker.wake()
+        }
         Poll::Ready(())
     }
 }
 
-pub struct Receiver<T>(Shared<T>);
+pub struct Receiver<T: Clone>(AsyncSafeShared<T>);
 
-impl<T> Receiver<T> {
+impl<T: Clone> Receiver<T> {
     pub fn recv(&self) -> RecvFut<T> {
-        RecvFut { receiver: self.0.clone() }
+        RecvFut {
+            receiver: self.0.clone(),
+        }
     }
 }
 
-pub struct RecvFut<T> {
-    receiver: Shared<T>,
+pub struct RecvFut<T: Clone> {
+    receiver: AsyncSafeShared<T>,
 }
 
-impl<T: Clone + std::fmt::Debug> Future for RecvFut<T> {
+impl<T: Clone> Future for RecvFut<T> {
     type Output = T;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.receiver.lock().dequeue() {
-            Some(item) => {
-                Poll::Ready(item.clone())
-            }
+        println!("RecvFut polled!");
+        let mut locked = self.receiver.lock();
+        let maybe_item = locked.queue.dequeue();
+        match maybe_item {
+            Some(item) => Poll::Ready(item),
             None => {
-                cx.waker().wake_by_ref();
+                // cx.waker().clone().wake();
+                locked.recv_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
         }
     }
 }
 
-pub fn circular<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
-    let shared = Arc::new(Mutex::new(RingBuffer::with_capacity(cap)));
-    (
-        Sender(shared.clone()),
-        Receiver(shared),
-    )
+pub fn circular<T: Clone>(cap: usize) -> (Sender<T>, Receiver<T>) {
+    let shared = Arc::new(Mutex::new(Shared {
+        queue: RingBuffer::with_capacity(cap),
+        recv_waker: None,
+    }));
+    (Sender(shared.clone()), Receiver(shared))
 }
 
 #[cfg(test)]
@@ -79,27 +98,52 @@ mod tests {
 
     #[test]
     fn tail_rewrite_on_overflow() {
-        tokio_test::block_on(
-            async move {
-                let (tx, rx) = circular::<u32>(64);
+        tokio_test::block_on(async move {
+            let (tx, rx) = circular::<u32>(64);
 
-                println!("Started");
+            println!("Started");
 
-                let send_handle = tokio_test::task::spawn(async move {
-                    for i in 0..65 {
-                        tx.send(i as u32).await;
-                        println!("Sent {}", i);
-                    };
-                });
+            let send_handle = tokio_test::task::spawn(async move {
+                for i in 0..65 {
+                    tx.send(i as u32).await;
+                    println!("Sent {}", i);
+                }
+            });
 
-                let _send_out = send_handle.await;
+            let _send_out = send_handle.await;
 
-                let recv_handle = tokio_test::task::spawn(async move {
-                    rx.recv().await
-                });
-                assert_eq!(recv_handle.await, 1);
-            }
+            let recv_handle = tokio_test::task::spawn(async move { rx.recv().await });
+            assert_eq!(recv_handle.await, 1);
+        })
+    }
 
-        )
+    #[test]
+    fn polling_once() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            let (tx, rx) = circular::<u32>(64);
+
+            println!("Started");
+
+            let mut recv_timer = tokio::time::interval(std::time::Duration::from_millis(200));
+            let handle = tokio::spawn(async move {
+                for _i in 0..5 {
+                    recv_timer.tick().await;
+                    println!("Received {}", rx.recv().await);
+                }
+            });
+
+            let mut timer = tokio::time::interval(std::time::Duration::from_millis(100));
+            let _ = tokio::spawn(async move {
+                for i in 0..5 {
+                    timer.tick().await;
+                    tx.send(i as u32).await;
+                    println!("Sent {}", i);
+                }
+            })
+            .await;
+
+            handle.await;
+        })
     }
 }

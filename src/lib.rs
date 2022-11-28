@@ -93,16 +93,16 @@ pub fn circular<T: Clone>(cap: usize) -> (Sender<T>, Receiver<T>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio_test;
 
     #[test]
     fn tail_rewrite_on_overflow() {
-        tokio_test::block_on(async move {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
             let (tx, rx) = circular::<u32>(64);
 
             println!("Started");
 
-            let send_handle = tokio_test::task::spawn(async move {
+            let send_handle = tokio::spawn(async move {
                 for i in 0..65 {
                     tx.send(i as u32).await;
                     println!("Sent {}", i);
@@ -111,8 +111,8 @@ mod tests {
 
             let _send_out = send_handle.await;
 
-            let recv_handle = tokio_test::task::spawn(async move { rx.recv().await });
-            assert_eq!(recv_handle.await, 1);
+            let recv_handle = tokio::spawn(async move { rx.recv().await });
+            assert_eq!(recv_handle.await.unwrap(), 1);
         })
     }
 

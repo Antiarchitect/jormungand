@@ -10,5 +10,4 @@ ringbuffer = "0.10.0"
 parking_lot = "0.12.1"
 
 [dev-dependencies]
-tokio-test = "*"
 tokio = { version = "*", features = ["full"] }

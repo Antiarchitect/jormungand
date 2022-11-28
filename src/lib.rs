@@ -39,7 +39,6 @@ impl<T: Clone> Future for SendFut<T> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        println!("SendFut polled!");
         let mut locked = self.sender.0.lock();
         locked.queue.enqueue(self.item.clone());
         if let Some(waker) = locked.recv_waker.take() {
@@ -68,13 +67,11 @@ impl<T> Future for RecvFut<T> {
     type Output = T;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        println!("RecvFut polled!");
         let mut locked = self.receiver.0.lock();
         let maybe_item = locked.queue.dequeue();
         match maybe_item {
             Some(item) => Poll::Ready(item),
             None => {
-                // cx.waker().clone().wake();
                 locked.recv_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
@@ -82,7 +79,7 @@ impl<T> Future for RecvFut<T> {
     }
 }
 
-pub fn circular<T: Clone>(cap: usize) -> (Sender<T>, Receiver<T>) {
+pub fn new<T: Clone>(cap: usize) -> (Sender<T>, Receiver<T>) {
     let shared = AsyncSafeShared(Arc::new(Mutex::new(Shared {
         queue: RingBuffer::with_capacity(cap),
         recv_waker: None,
@@ -98,7 +95,7 @@ mod tests {
     fn tail_rewrite_on_overflow() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
-            let (tx, rx) = circular::<u32>(64);
+            let (tx, rx) = new::<u32>(64);
 
             println!("Started");
 
@@ -120,7 +117,7 @@ mod tests {
     fn polling_once() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
-            let (tx, rx) = circular::<u32>(64);
+            let (tx, rx) = new::<u32>(64);
 
             println!("Started");
 

@@ -1,9 +1,9 @@
 [package]
-description = "Async circular queue that removes old items in favor of new ones on overflow"
+description = "Async circular queue that replaces old items with new ones on overflow"
 edition = "2021"
 license = "MIT"
 name = "jormungand"
-version = "0.0.1"
+version = "0.0.2"
 
 [dependencies]
 ringbuffer = "0.10.0"

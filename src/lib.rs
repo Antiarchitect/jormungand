@@ -10,18 +10,16 @@ use parking_lot::Mutex;
 use ringbuffer::AllocRingBuffer as RingBuffer;
 use ringbuffer::{RingBufferRead, RingBufferWrite};
 
-type AsyncSafeShared<T> = Arc<Mutex<Shared<T>>>;
-
 #[derive(Clone)]
+struct AsyncSafeShared<T>(Arc<Mutex<Shared<T>>>);
+
 struct Shared<T>
-where
-    T: Clone,
 {
     queue: RingBuffer<T>,
     recv_waker: Option<Waker>,
 }
 
-pub struct Sender<T: Clone>(AsyncSafeShared<T>);
+pub struct Sender<T>(AsyncSafeShared<T>);
 
 impl<T: Clone> Sender<T> {
     pub fn send(&self, item: T) -> SendFut<T> {
@@ -32,7 +30,7 @@ impl<T: Clone> Sender<T> {
     }
 }
 
-pub struct SendFut<T: Clone> {
+pub struct SendFut<T> {
     sender: AsyncSafeShared<T>,
     item: T,
 }
@@ -42,7 +40,7 @@ impl<T: Clone> Future for SendFut<T> {
 
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         println!("SendFut polled!");
-        let mut locked = self.sender.lock();
+        let mut locked = self.sender.0.lock();
         locked.queue.enqueue(self.item.clone());
         if let Some(waker) = locked.recv_waker.take() {
             waker.wake()
@@ -51,7 +49,7 @@ impl<T: Clone> Future for SendFut<T> {
     }
 }
 
-pub struct Receiver<T: Clone>(AsyncSafeShared<T>);
+pub struct Receiver<T>(AsyncSafeShared<T>);
 
 impl<T: Clone> Receiver<T> {
     pub fn recv(&self) -> RecvFut<T> {
@@ -61,16 +59,16 @@ impl<T: Clone> Receiver<T> {
     }
 }
 
-pub struct RecvFut<T: Clone> {
+pub struct RecvFut<T> {
     receiver: AsyncSafeShared<T>,
 }
 
-impl<T: Clone> Future for RecvFut<T> {
+impl<T> Future for RecvFut<T> {
     type Output = T;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         println!("RecvFut polled!");
-        let mut locked = self.receiver.lock();
+        let mut locked = self.receiver.0.lock();
         let maybe_item = locked.queue.dequeue();
         match maybe_item {
             Some(item) => Poll::Ready(item),
@@ -84,10 +82,10 @@ impl<T: Clone> Future for RecvFut<T> {
 }
 
 pub fn circular<T: Clone>(cap: usize) -> (Sender<T>, Receiver<T>) {
-    let shared = Arc::new(Mutex::new(Shared {
+    let shared = AsyncSafeShared(Arc::new(Mutex::new(Shared {
         queue: RingBuffer::with_capacity(cap),
         recv_waker: None,
-    }));
+    })));
     (Sender(shared.clone()), Receiver(shared))
 }
 

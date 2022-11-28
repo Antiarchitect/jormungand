@@ -19,6 +19,7 @@ struct Shared<T>
     recv_waker: Option<Waker>,
 }
 
+#[derive(Clone)]
 pub struct Sender<T>(AsyncSafeShared<T>);
 
 impl<T: Clone> Sender<T> {
@@ -49,6 +50,7 @@ impl<T: Clone> Future for SendFut<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct Receiver<T>(AsyncSafeShared<T>);
 
 impl<T: Clone> Receiver<T> {

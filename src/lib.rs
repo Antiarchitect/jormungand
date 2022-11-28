@@ -11,14 +11,12 @@ use parking_lot::Mutex;
 
 type Shared<T> = Arc<Mutex<RingBuffer<T>>>;
 
-pub struct Sender<T> {
-    shared: Shared<T>
-}
+pub struct Sender<T>(Shared<T>);
 
 impl<T> Sender<T> {
     pub fn send(&self, item: T) -> SendFut<T> {
         SendFut {
-            sender: self.shared.clone(),
+            sender: self.0.clone(),
             item: item,
         }
     }
@@ -38,13 +36,11 @@ impl<T: Clone> Future for SendFut<T> {
     }
 }
 
-pub struct Receiver<T> {
-    shared: Shared<T>
-}
+pub struct Receiver<T>(Shared<T>);
 
 impl<T> Receiver<T> {
     pub fn recv(&self) -> RecvFut<T> {
-        RecvFut { receiver: self.shared.clone() }
+        RecvFut { receiver: self.0.clone() }
     }
 }
 
@@ -71,8 +67,8 @@ impl<T: Clone + std::fmt::Debug> Future for RecvFut<T> {
 pub fn circular<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
     let shared = Arc::new(Mutex::new(RingBuffer::with_capacity(cap)));
     (
-        Sender { shared: shared.clone() },
-        Receiver { shared },
+        Sender(shared.clone()),
+        Receiver(shared),
     )
 }
 

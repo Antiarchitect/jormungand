@@ -13,8 +13,7 @@ use ringbuffer::{RingBufferRead, RingBufferWrite};
 #[derive(Clone)]
 struct AsyncSafeShared<T>(Arc<Mutex<Shared<T>>>);
 
-struct Shared<T>
-{
+struct Shared<T> {
     queue: RingBuffer<T>,
     recv_waker: Option<Waker>,
 }
@@ -143,7 +142,7 @@ mod tests {
             })
             .await;
 
-            handle.await;
+            let _ = handle.await;
         })
     }
 }

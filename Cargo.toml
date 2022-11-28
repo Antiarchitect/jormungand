@@ -1,10 +1,9 @@
 [package]
-name = "jormungand"
-version = "0.0.1"
+description = "Async circular queue that removes old items in favor of new ones on overflow"
 edition = "2021"
 license = "MIT"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+name = "jormungand"
+version = "0.0.1"
 
 [dependencies]
 ringbuffer = "0.10.0"

@@ -23,8 +23,8 @@ async fn main() {
             println!("Sent {}", i);
         }
     })
-        .await
-        .expect("Sender part has failed!");
+    .await
+    .expect("Sender part has failed!");
 
     receiver_handle.await.expect("Receiver part has failed!");
 }

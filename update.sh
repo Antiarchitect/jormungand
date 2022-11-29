@@ -10,6 +10,7 @@ rustup self update 2>/dev/null || true \
     && cargo fmt \
     && cargo clippy \
     && cargo build \
+    && cargo test \
     && cargo install --locked cargo-audit \
     && cargo audit || true \
     && cargo install --locked cargo-pants \

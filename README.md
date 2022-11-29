@@ -1,9 +1,9 @@
 <p align="center">
     <a href="https://crates.io/crates/jormungand">
-         <img src="https://img.shields.io/crates/v/jormungand.svg?style=flat-square" alt="crates.io">
+         <img src="https://img.shields.io/crates/v/jormungand.svg?style=flat-square" alt="https://crates.io/crates/jormungand">
     </a>
     <a href="https://opensource.org/licenses/MIT">
-        <img src="https://img.shields.io/badge/License-MIT-blue.svg">
+        <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="https://opensource.org/licenses/MIT">
     </a>
 </p>
 

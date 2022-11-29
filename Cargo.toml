@@ -1,5 +1,5 @@
 [package]
-description = "Async circular queue that replaces old items with new ones on overflow"
+description = "Async and thread safe circular buffer that rewrites old items on overflow"
 edition = "2021"
 license = "MIT"
 name = "jormungand"

@@ -99,17 +99,21 @@ mod tests {
 
             println!("Started");
 
-            let send_handle = tokio::spawn(async move {
+            tokio::spawn(async move {
                 for i in 0..65 {
                     tx.send(i as u32).await;
                     println!("Sent {}", i);
                 }
-            });
+            })
+            .await
+            .expect("Sender part has failed!");
 
-            let _send_out = send_handle.await;
-
-            let recv_handle = tokio::spawn(async move { rx.recv().await });
-            assert_eq!(recv_handle.await.unwrap(), 1);
+            assert_eq!(
+                tokio::spawn(async move { rx.recv().await })
+                    .await
+                    .expect("Receiver part has failed!"),
+                1
+            );
         })
     }
 
@@ -121,25 +125,26 @@ mod tests {
 
             println!("Started");
 
-            let mut recv_timer = tokio::time::interval(std::time::Duration::from_millis(200));
-            let handle = tokio::spawn(async move {
+            let mut receiver_timer = tokio::time::interval(std::time::Duration::from_millis(20));
+            let receiver_handle = tokio::spawn(async move {
                 for _i in 0..5 {
-                    recv_timer.tick().await;
+                    receiver_timer.tick().await;
                     println!("Received {}", rx.recv().await);
                 }
             });
 
-            let mut timer = tokio::time::interval(std::time::Duration::from_millis(100));
-            let _ = tokio::spawn(async move {
+            let mut sender_timer = tokio::time::interval(std::time::Duration::from_millis(10));
+            tokio::spawn(async move {
                 for i in 0..5 {
-                    timer.tick().await;
+                    sender_timer.tick().await;
                     tx.send(i as u32).await;
                     println!("Sent {}", i);
                 }
             })
-            .await;
+            .await
+            .expect("Sender part has failed!");
 
-            let _ = handle.await;
+            receiver_handle.await.expect("Receiver part has failed!");
         })
     }
 }

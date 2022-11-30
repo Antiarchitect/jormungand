@@ -1,6 +1,9 @@
 <p align="center">
     <a href="https://crates.io/crates/jormungand">
-         <img src="https://img.shields.io/crates/v/jormungand.svg?style=flat-square" alt="https://crates.io/crates/jormungand">
+        <img src="https://img.shields.io/crates/v/jormungand.svg?style=flat-square" alt="https://crates.io/crates/jormungand">
+    </a>
+    <a href="https://docs.rs/jormungand">
+        <img alt="https://docs.rs/jormungand" src="https://docs.rs/jormungand/badge.svg">
     </a>
     <a href="https://opensource.org/licenses/MIT">
         <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="https://opensource.org/licenses/MIT">
